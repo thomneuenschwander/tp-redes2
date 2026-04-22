@@ -218,6 +218,32 @@ O lado WAN do AP NAT é conectado ponto a ponto
 - **Auth**:  WPA2-PSK
 - **Encryption**: AES
 - **Passphrase**: naisseslegal
+
+##### ACLs
+Após configurar o AP NAT, é importante notar que os hosts em NAT conseguem se comunicar com as 3 VLANs internas da unidade. Naturalmente,  os hosts das VLANs não conseguem se comunicar com os hosts em NAT. A rede em NAT é para visitantes, e por segurança, eles não deveriam ter acesso a rede interna. Por um lado, a comunicação cross-unit já está bloqueada "de graça" pela decisão de não anunciar os `/30` do lado WAN do AP NAT no OSPF. Sendo assim, só é preciso configurar uma ACL para bloquear o acesso intra-unidade.
+
+**ACL** *(Access Control List)* é basicamente uma lista de regras usada para permitir ou negar tráfego. É tipo uma versão mais simples/manual de um firewall, geralmente usada em routers e swithces.
+
+No caso do projeto, é preciso criar a **ACL inbound** na interface que recebe tráfego vindo da WAN do AP NAT. A lógica é: "tudo que vem do /30 do AP NAT, se tiver destino em alguma rede interna da empresa, descarta".
+
+```bash
+enable
+configure terminal
+
+access-list 110 deny ip 192.168.2.0 0.0.0.3 192.168.10.0 0.0.0.255
+access-list 110 deny ip 192.168.2.0 0.0.0.3 192.168.11.0 0.0.0.255
+access-list 110 deny ip 192.168.2.0 0.0.0.3 192.168.20.0 0.0.0.255
+access-list 110 deny ip 192.168.2.0 0.0.0.3 192.168.30.0 0.0.0.255
+access-list 110 permit ip any any # permite o que não esta sendo negado
+
+interface gigabitEthernet 0/1
+ ip access-group 110 in
+
+end
+write memory
+```
+para ver a ACL list: `show access-lists`
+
 ### Conexão Filial 1 ↔ Sede
 Para conectar F1 é preciso de uma conexao ponto-a-ponto.  No entanto, há um problema. TODAS as portas  atuais do router da Sede ficariam  se conectasse alguma das filiais, impedindo do router da Sede se conctar futuramente com a Filial 2. Para contornar isso, é preciso adicionar  placa de expansão `HWIC` no roteador, adicionando mais portas/interfaces. Há a possibilidade de escolha de vários tipos de portas para serem expandidas, como:
   - HWIC Ethernet/FastEthernet/GigabitEthernet: adiciona portas Ethernet.
